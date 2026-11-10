@@ -16,10 +16,10 @@ jobs:
       ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
 
     steps:
-      - name: Checkout
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup Java
+      - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -35,16 +35,14 @@ jobs:
         run: |
           set -e
 
-          mkdir -p "$ANDROID_HOME/cmdline-tools"
-          mkdir -p /tmp/android-tools
+          mkdir -p "$ANDROID_HOME/cmdline-tools/latest"
 
           curl -fL \
             https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip \
             -o /tmp/android-tools.zip
 
+          mkdir -p /tmp/android-tools
           unzip -q /tmp/android-tools.zip -d /tmp/android-tools
-
-          mkdir -p "$ANDROID_HOME/cmdline-tools/latest"
 
           cp -r /tmp/android-tools/cmdline-tools/. \
             "$ANDROID_HOME/cmdline-tools/latest/"
@@ -54,6 +52,7 @@ jobs:
           yes | "$SDK" --sdk_root="$ANDROID_HOME" --licenses || true
 
           "$SDK" --sdk_root="$ANDROID_HOME" \
+            "platform-tools" \
             "platforms;android-34" \
             "build-tools;34.0.0" \
             "ndk;25.2.9519653" \
@@ -63,8 +62,6 @@ jobs:
         shell: bash
         run: |
           set -e
-
-          mkdir -p project
 
           unzip -o .github/workflows/panel.zip -d project
 
@@ -77,30 +74,19 @@ jobs:
             exit 1
           fi
 
-      - name: Clean Old Build Files
-        shell: bash
+      - name: Clean Old Native Build
         run: |
-          set -e
-
           rm -rf "$PROJECT_DIR/app/build"
           rm -rf "$PROJECT_DIR/app/.cxx"
 
-          find "$PROJECT_DIR" -type f \
-            ! -path '*/.git/*' \
-            -exec touch {} +
-
-      - name: Build APK
-        shell: bash
+      - name: Build Debug APK
         run: |
-          set -e
           cd "$PROJECT_DIR"
-
           gradle --no-daemon clean assembleDebug
 
       - name: Verify APK
         run: |
           APK="$PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk"
-
           test -s "$APK"
           ls -lh "$APK"
 
