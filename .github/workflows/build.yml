@@ -16,10 +16,10 @@ jobs:
       ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Java 17
+      - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -30,7 +30,7 @@ jobs:
         with:
           gradle-version: '8.2.1'
 
-      - name: Install Fresh Android SDK Manager
+      - name: Install Android SDK
         shell: bash
         run: |
           set -e
@@ -39,33 +39,21 @@ jobs:
           mkdir -p /tmp/android-tools
 
           curl -fL \
-            "https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip" \
+            https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip \
             -o /tmp/android-tools.zip
 
           unzip -q /tmp/android-tools.zip -d /tmp/android-tools
-
-          rm -rf "$ANDROID_HOME/cmdline-tools/latest"
 
           mkdir -p "$ANDROID_HOME/cmdline-tools/latest"
 
           cp -r /tmp/android-tools/cmdline-tools/. \
             "$ANDROID_HOME/cmdline-tools/latest/"
 
-          echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
-
-          test -f "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
-
-      - name: Install Android SDK Packages
-        shell: bash
-        run: |
-          set -e
-
           SDK="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
 
           yes | "$SDK" --sdk_root="$ANDROID_HOME" --licenses || true
 
           "$SDK" --sdk_root="$ANDROID_HOME" \
-            "platform-tools" \
             "platforms;android-34" \
             "build-tools;34.0.0" \
             "ndk;25.2.9519653" \
@@ -76,46 +64,44 @@ jobs:
         run: |
           set -e
 
-          ZIP=".github/workflows/panel.zip"
-
-          if [ ! -f "$ZIP" ]; then
-            echo "ERROR: panel.zip not found"
-            exit 1
-          fi
-
           mkdir -p project
-          unzip -o "$ZIP" -d project
+
+          unzip -o .github/workflows/panel.zip -d project
 
           if [ -f project/app/build.gradle ]; then
             echo "PROJECT_DIR=project" >> "$GITHUB_ENV"
-
           elif [ -f project/app/app/build.gradle ]; then
             echo "PROJECT_DIR=project/app" >> "$GITHUB_ENV"
-
           else
             echo "ERROR: Gradle project not found"
-            find project -maxdepth 4 -type f
             exit 1
           fi
 
-      - name: Build Debug APK
+      - name: Clean Old Build Files
+        shell: bash
+        run: |
+          set -e
+
+          rm -rf "$PROJECT_DIR/app/build"
+          rm -rf "$PROJECT_DIR/app/.cxx"
+
+          find "$PROJECT_DIR" -type f \
+            ! -path '*/.git/*' \
+            -exec touch {} +
+
+      - name: Build APK
         shell: bash
         run: |
           set -e
           cd "$PROJECT_DIR"
 
-          gradle --no-daemon assembleDebug
+          gradle --no-daemon clean assembleDebug
 
       - name: Verify APK
-        shell: bash
         run: |
           APK="$PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk"
 
-          if [ ! -f "$APK" ]; then
-            echo "ERROR: APK not generated"
-            exit 1
-          fi
-
+          test -s "$APK"
           ls -lh "$APK"
 
       - name: Upload APK
