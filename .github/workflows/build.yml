@@ -7,7 +7,8 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    # Yahan humne latest ki jagah 22.04 fix kar diya hai
+    runs-on: ubuntu-22.04
 
     steps:
     - name: Checkout Code
@@ -22,13 +23,16 @@ jobs:
     - name: Setup Android SDK
       uses: android-actions/setup-android@v3
 
-    # YEH NAYI LINE ADD KI HAI (Licenses accept karne ke liye)
     - name: Accept Android SDK Licenses
       run: yes | sdkmanager --licenses || true
 
-    # AIDE project mein gradlew nahi hota, isliye system Gradle use karenge
+    # NDK aur CMake manually install kar rahe hain taaki koi error na aaye
+    - name: Install NDK and CMake
+      run: |
+        sdkmanager "ndk;25.2.9519653" "cmake;3.22.1"
+
     - name: Setup Gradle
-      uses: gradle/gradle-build-action@v2
+      uses: gradle/actions/setup-gradle@v3
 
     - name: Build APK
       run: gradle assembleDebug
