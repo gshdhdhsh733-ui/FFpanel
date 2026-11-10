@@ -24,11 +24,9 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
-    # Yahan humne SDK setup wala pura step hata diya hai
-    # Sirf licenses accept kar rahe hain default SDK ke liye
-    
-    - name: Accept Android SDK Licenses
-      run: yes | sdkmanager --licenses || true
+    # Official Google Action (Yeh khud SDK handle karega)
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
 
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v3
