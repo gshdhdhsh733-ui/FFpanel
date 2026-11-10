@@ -1,6 +1,9 @@
 name: Android Build
 
 on:
+  name: Android Build
+
+on:
   workflow_dispatch:
   push:
     branches: [main]
@@ -74,9 +77,12 @@ jobs:
           echo "PROJECT_DIR=$ROOT" >> "$GITHUB_ENV"
           echo "Detected project: $ROOT"
 
-      - name: Clean old build outputs
+      # YEH NAYA STEP HAI: Timestamp fix aur deep clean
+      - name: Clean old build outputs and fix timestamps
         run: |
           rm -rf "$PROJECT_DIR/app/build" "$PROJECT_DIR/app/.cxx"
+          # ZIP extraction ke future timestamps ko reset kar rahe hain
+          find "$PROJECT_DIR" -exec touch {} +
 
       - name: Build debug APK
         run: |
