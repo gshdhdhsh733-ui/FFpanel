@@ -24,15 +24,15 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
-    # Official Google Action (Yeh khud SDK handle karega)
-    - name: Setup Android SDK
-      uses: android-actions/setup-android@v3
-
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v3
 
+    # Bina kisi external SDK setup ke direct build
     - name: Build APK
       run: gradle assembleDebug
+      env:
+        ANDROID_HOME: /usr/local/lib/android/sdk
+        ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
