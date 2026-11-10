@@ -11,8 +11,12 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Setup Java 17
@@ -26,6 +30,31 @@ jobs:
         with:
           gradle-version: '8.2.1'
 
+      - name: Find Android SDK Manager
+        shell: bash
+        run: |
+          SDKMANAGER=$(find "$ANDROID_HOME" -type f -name sdkmanager 2>/dev/null | head -n 1)
+
+          if [ -z "$SDKMANAGER" ]; then
+            echo "ERROR: sdkmanager not found"
+            find /usr/local/lib/android -maxdepth 5 -type f -name sdkmanager
+            exit 1
+          fi
+
+          echo "SDKMANAGER=$SDKMANAGER" >> "$GITHUB_ENV"
+          echo "$(dirname "$SDKMANAGER")" >> "$GITHUB_PATH"
+
+      - name: Install Android packages
+        shell: bash
+        run: |
+          yes | "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --licenses || true
+
+          "$SDKMANAGER" --sdk_root="$ANDROID_HOME" \
+            "platforms;android-34" \
+            "build-tools;34.0.0" \
+            "ndk;25.2.9519653" \
+            "cmake;3.22.1"
+
       - name: Extract project ZIP
         run: |
           mkdir -p project
@@ -36,19 +65,9 @@ jobs:
           elif [ -f project/app/app/build.gradle ]; then
             echo "PROJECT_DIR=project/app" >> "$GITHUB_ENV"
           else
-            echo "Project Gradle files not found"
-            find project -maxdepth 4 -type f
+            echo "Project files not found"
             exit 1
           fi
-
-      - name: Install Android SDK packages
-        run: |
-          yes | sdkmanager --licenses
-          sdkmanager \
-            "platforms;android-34" \
-            "build-tools;34.0.0" \
-            "ndk;25.2.9519653" \
-            "cmake;3.22.1"
 
       - name: Build APK
         run: |
