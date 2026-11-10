@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    # Yahan humne latest ki jagah 22.04 fix kar diya hai
+    # Ubuntu 22.04 sabse stable hai
     runs-on: ubuntu-22.04
 
     steps:
@@ -20,13 +20,14 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
-    - name: Setup Android SDK
-      uses: android-actions/setup-android@v3
+    # YAHAN HUMNE FIX KIYA HAI (Manual License Accept)
+    - name: Manually Accept Android SDK Licenses
+      run: |
+        mkdir -p "$ANDROID_HOME/licenses"
+        echo -e "\n8933bad161af4178b1185d1a37fbf41ea5269c55\nd56f5187479451eabf01fb78af6dfcb131a6481e\n24333f8a63b6825ea9c5514f83c2829b004d1fee" > "$ANDROID_HOME/licenses/android-sdk-license"
+        echo -e "\n84831b9409646a918e30573bab4c9c91346d8abd" > "$ANDROID_HOME/licenses/android-sdk-preview-license"
 
-    - name: Accept Android SDK Licenses
-      run: yes | sdkmanager --licenses || true
-
-    # NDK aur CMake manually install kar rahe hain taaki koi error na aaye
+    # NDK aur CMake install karna
     - name: Install NDK and CMake
       run: |
         sdkmanager "ndk;25.2.9519653" "cmake;3.22.1"
