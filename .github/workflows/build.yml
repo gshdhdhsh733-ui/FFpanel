@@ -41,14 +41,23 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          OUTER=".github/workflows/panel.zip"
-          test -f "$OUTER" || { echo "Missing $OUTER"; exit 1; }
-
+          
+          # Yahan hum koi bhi zip file dhoondh rahe hain jo .github/workflows/ me rakhi ho
+          OUTER=$(find .github/workflows -maxdepth 1 -name "*.zip" | head -n 1)
+          
+          if [ -z "$OUTER" ]; then 
+            echo "ERROR: Koi .zip file nahi mili .github/workflows/ folder me!"
+            exit 1
+          fi
+          
+          echo "Found ZIP file: $OUTER"
+          
           rm -rf wrapper project
           mkdir -p wrapper project
           unzip -q -o "$OUTER" -d wrapper
 
-          INNER="$(find wrapper -type f -name 'panel.zip' -print -quit)"
+          # Agar zip ke andar ek aur zip hai
+          INNER="$(find wrapper -type f -name '*.zip' -print -quit)"
           if [ -n "$INNER" ]; then
             echo "Nested ZIP found: $INNER"
             unzip -q -o "$INNER" -d project
@@ -57,16 +66,17 @@ jobs:
             cp -a wrapper/. project/
           fi
 
+          # Project ka root folder dhoondhna
           SETTINGS="$(find project -type f \( -name settings.gradle -o -name settings.gradle.kts \) -print -quit)"
           if [ -z "$SETTINGS" ]; then
-            echo "ERROR: settings.gradle(.kts) not found. ZIP contents:"
+            echo "ERROR: settings.gradle not found. ZIP contents:"
             find project -maxdepth 6 -type f | sort | head -200
             exit 1
           fi
 
           ROOT="$(dirname "$SETTINGS")"
           if [ ! -f "$ROOT/app/build.gradle" ] && [ ! -f "$ROOT/app/build.gradle.kts" ]; then
-            echo "ERROR: app/build.gradle(.kts) not found under $ROOT"
+            echo "ERROR: app/build.gradle not found under $ROOT"
             find "$ROOT" -maxdepth 4 -type f | sort | head -200
             exit 1
           fi
