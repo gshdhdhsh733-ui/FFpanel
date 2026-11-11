@@ -1,106 +1,50 @@
-name: Android Build
+name: Build Hex APK
 
 on:
-  workflow_dispatch:
   push:
-    branches: [main]
+    branches: [ "main", "master" ]
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      ANDROID_HOME: /usr/local/lib/android/sdk
-      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
 
     steps:
-      - uses: actions/checkout@v4
+    - name: Checkout Code
+      uses: actions/checkout@v4
 
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
 
-      - uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.2.1'
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v3
 
-      - name: Install Android SDK
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p "$ANDROID_HOME/cmdline-tools" /tmp/android-cli
-          curl -fL --retry 3 https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -o /tmp/android-cli.zip
-          unzip -q /tmp/android-cli.zip -d /tmp/android-cli
-          mkdir -p "$ANDROID_HOME/cmdline-tools/latest"
-          cp -R /tmp/android-cli/cmdline-tools/. "$ANDROID_HOME/cmdline-tools/latest/"
-          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
-          yes | "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --licenses || true
-          "$SDKMANAGER" --sdk_root="$ANDROID_HOME" "platform-tools" "platforms;android-34" "build-tools;34.0.0" "ndk;25.2.9519653" "cmake;3.22.1"
+    - name: Unzip Source Code
+      run: |
+        # Zip file ko dhoondhna aur unzip karna
+        ZIP_FILE=$(find . -maxdepth 1 -name "*.zip" | head -n 1)
+        if [ -z "$ZIP_FILE" ]; then
+          echo "Error: Koi ZIP file nahi mili!"
+          exit 1
+        fi
+        echo "Found ZIP: $ZIP_FILE"
+        unzip -q "$ZIP_FILE" -d extracted_project
 
-      - name: Extract nested project ZIP
-        shell: bash
-        run: |
-          set -euo pipefail
-          
-          # Yahan hum koi bhi zip file dhoondh rahe hain jo .github/workflows/ me rakhi ho
-          OUTER=$(find .github/workflows -maxdepth 1 -name "*.zip" | head -n 1)
-          
-          if [ -z "$OUTER" ]; then 
-            echo "ERROR: Koi .zip file nahi mili .github/workflows/ folder me!"
-            exit 1
-          fi
-          
-          echo "Found ZIP file: $OUTER"
-          
-          rm -rf wrapper project
-          mkdir -p wrapper project
-          unzip -q -o "$OUTER" -d wrapper
+    - name: Build with Gradle
+      run: |
+        # Project ka root folder dhoondhna (jahan settings.gradle ho)
+        PROJECT_DIR=$(find extracted_project -name "settings.gradle" -exec dirname {} \; | head -n 1)
+        echo "Project found at: $PROJECT_DIR"
+        cd "$PROJECT_DIR"
+        chmod +x gradlew
+        ./gradlew assembleDebug
 
-          # Agar zip ke andar ek aur zip hai
-          INNER="$(find wrapper -type f -name '*.zip' -print -quit)"
-          if [ -n "$INNER" ]; then
-            echo "Nested ZIP found: $INNER"
-            unzip -q -o "$INNER" -d project
-          else
-            echo "No nested ZIP; checking extracted contents directly"
-            cp -a wrapper/. project/
-          fi
-
-          # Project ka root folder dhoondhna
-          SETTINGS="$(find project -type f \( -name settings.gradle -o -name settings.gradle.kts \) -print -quit)"
-          if [ -z "$SETTINGS" ]; then
-            echo "ERROR: settings.gradle not found. ZIP contents:"
-            find project -maxdepth 6 -type f | sort | head -200
-            exit 1
-          fi
-
-          ROOT="$(dirname "$SETTINGS")"
-          if [ ! -f "$ROOT/app/build.gradle" ] && [ ! -f "$ROOT/app/build.gradle.kts" ]; then
-            echo "ERROR: app/build.gradle not found under $ROOT"
-            find "$ROOT" -maxdepth 4 -type f | sort | head -200
-            exit 1
-          fi
-
-          echo "PROJECT_DIR=$ROOT" >> "$GITHUB_ENV"
-          echo "Detected project: $ROOT"
-
-      - name: Clean old build outputs
-        run: |
-          rm -rf "$PROJECT_DIR/app/build" "$PROJECT_DIR/app/.cxx"
-
-      - name: Build debug APK
-        run: |
-          cd "$PROJECT_DIR"
-          gradle --no-daemon --stacktrace clean assembleDebug
-
-      - name: Verify APK
-        run: |
-          APK="$PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk"
-          test -s "$APK"
-          ls -lh "$APK"
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: Panel-APK
-          path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk
-          if-no-files-found: error
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: Hex-Non-Rooted-APK
+        path: extracted_project/**/app/build/outputs/apk/debug/app-debug.apk
+        if-no-files-found: error
