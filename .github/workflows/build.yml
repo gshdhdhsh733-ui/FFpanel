@@ -42,21 +42,19 @@ jobs:
         run: |
           set -euo pipefail
           
-          # Script khud hi dhoondh lega ki ZIP file kahan hai
+          # ZIP file dhoondhna
           OUTER=$(find . -name "*.zip" | head -n 1)
-          
           if [ -z "$OUTER" ]; then
             echo "ERROR: Koi bhi ZIP file nahi mili!"
             exit 1
           fi
-          
           echo "Mil gayi ZIP file: $OUTER"
 
           rm -rf project
           mkdir -p project
           unzip -q -o "$OUTER" -d project
 
-          # Project ka main folder (jahan settings.gradle hai) dhoondhna
+          # settings.gradle dhoondhna
           SETTINGS="$(find project -type f \( -name settings.gradle -o -name settings.gradle.kts \) -print -quit)"
           if [ -z "$SETTINGS" ]; then
             echo "ERROR: settings.gradle not found in ZIP."
@@ -70,9 +68,14 @@ jobs:
         run: |
           rm -rf "$PROJECT_DIR/app/build" "$PROJECT_DIR/app/.cxx"
 
-      - name: Build debug APK
+      - name: Fix AndroidX and Build APK
         run: |
           cd "$PROJECT_DIR"
+          # Yeh AndroidX wala error fix karega
+          echo "android.useAndroidX=true" >> gradle.properties
+          echo "android.enableJetifier=true" >> gradle.properties
+          
+          # APK Build command
           gradle --no-daemon --stacktrace clean assembleDebug
 
       - name: Upload APK
