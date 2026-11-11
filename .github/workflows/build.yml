@@ -13,18 +13,21 @@ jobs:
       ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-java@v4
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      - uses: gradle/actions/setup-gradle@v4
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.2.1'
 
-      - name: Install Android SDK
+      - name: Install Android SDK & NDK
         shell: bash
         run: |
           set -euo pipefail
@@ -37,12 +40,12 @@ jobs:
           yes | "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --licenses || true
           "$SDKMANAGER" --sdk_root="$ANDROID_HOME" "platform-tools" "platforms;android-34" "build-tools;34.0.0" "ndk;25.2.9519653" "cmake;3.22.1"
 
-      - name: Extract project ZIP
+      - name: Extract Project ZIP
         shell: bash
         run: |
           set -euo pipefail
           
-          # ZIP file dhoondhna
+          # 1. ZIP file dhoondhna (Jahan bhi ho)
           OUTER=$(find . -name "*.zip" | head -n 1)
           if [ -z "$OUTER" ]; then
             echo "ERROR: Koi bhi ZIP file nahi mili!"
@@ -50,33 +53,38 @@ jobs:
           fi
           echo "Mil gayi ZIP file: $OUTER"
 
+          # 2. Unzip karna
           rm -rf project
           mkdir -p project
           unzip -q -o "$OUTER" -d project
 
-          # settings.gradle dhoondhna
+          # 3. Root folder dhoondhna (jahan settings.gradle ho)
           SETTINGS="$(find project -type f \( -name settings.gradle -o -name settings.gradle.kts \) -print -quit)"
           if [ -z "$SETTINGS" ]; then
-            echo "ERROR: settings.gradle not found in ZIP."
+            echo "ERROR: settings.gradle nahi mili ZIP ke andar."
             exit 1
           fi
-
           ROOT="$(dirname "$SETTINGS")"
           echo "PROJECT_DIR=$ROOT" >> "$GITHUB_ENV"
+          echo "Project root detected at: $ROOT"
 
-      - name: Clean old build outputs
-        run: |
-          rm -rf "$PROJECT_DIR/app/build" "$PROJECT_DIR/app/.cxx"
-
-      - name: Fix AndroidX and Build APK
+      - name: Force Fix Gradle Properties
+        shell: bash
         run: |
           cd "$PROJECT_DIR"
-          # Yeh AndroidX wala error fix karega
+          # AIDE ki purani galtiyan mitane ke liye hum nayi file bana rahe hain
+          rm -f gradle.properties
           echo "android.useAndroidX=true" >> gradle.properties
           echo "android.enableJetifier=true" >> gradle.properties
-          
-          # APK Build command
-          gradle --no-daemon --stacktrace clean assembleDebug
+          echo "org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8" >> gradle.properties
+          echo "org.gradle.parallel=true" >> gradle.properties
+
+      - name: Clean and Build APK
+        shell: bash
+        run: |
+          cd "$PROJECT_DIR"
+          # Gradle ko force karna ki wo local wrapper chhode aur global gradle use kare
+          gradle --no-daemon clean assembleDebug --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
