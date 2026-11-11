@@ -44,26 +44,27 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          
-          # 1. ZIP file dhoondhna (Jahan bhi ho)
-          OUTER=$(find . -name "*.zip" | head -n 1)
+
+          OUTER=$(find . -type f -name "*.zip" -not -path "./.git/*" -print -quit)
+
           if [ -z "$OUTER" ]; then
             echo "ERROR: Koi bhi ZIP file nahi mili!"
             exit 1
           fi
+
           echo "Mil gayi ZIP file: $OUTER"
 
-          # 2. Unzip karna
           rm -rf project
           mkdir -p project
           unzip -q -o "$OUTER" -d project
 
-          # 3. Root folder dhoondhna (jahan settings.gradle ho)
           SETTINGS="$(find project -type f \( -name settings.gradle -o -name settings.gradle.kts \) -print -quit)"
+
           if [ -z "$SETTINGS" ]; then
             echo "ERROR: settings.gradle nahi mili ZIP ke andar."
             exit 1
           fi
+
           ROOT="$(dirname "$SETTINGS")"
           echo "PROJECT_DIR=$ROOT" >> "$GITHUB_ENV"
           echo "Project root detected at: $ROOT"
@@ -72,7 +73,6 @@ jobs:
         shell: bash
         run: |
           cd "$PROJECT_DIR"
-          # AIDE ki purani galtiyan mitane ke liye hum nayi file bana rahe hain
           rm -f gradle.properties
           echo "android.useAndroidX=true" >> gradle.properties
           echo "android.enableJetifier=true" >> gradle.properties
@@ -82,8 +82,8 @@ jobs:
       - name: Clean and Build APK
         shell: bash
         run: |
+          set -euo pipefail
           cd "$PROJECT_DIR"
-          # Gradle ko force karna ki wo local wrapper chhode aur global gradle use kare
           gradle --no-daemon clean assembleDebug --stacktrace
 
       - name: Upload APK
