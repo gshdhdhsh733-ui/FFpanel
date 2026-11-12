@@ -1,94 +1,57 @@
-name: Build Hex Non Rooted APK
+name: Build Ghost Lag Hex APK
 
 on:
-  workflow_dispatch:
   push:
-    branches: [main]
+    branches: [ "main", "master" ]
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      ANDROID_HOME: /usr/local/lib/android/sdk
-      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
 
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
+    - name: Checkout Code
+      uses: actions/checkout@v4
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
+    - name: Extract Project ZIP
+      run: |
+        # Jo bhi zip file hai root me, use unzip karo
+        ZIP_FILE=$(find . -maxdepth 2 -name "*.zip" | head -n 1)
+        if [ -z "$ZIP_FILE" ]; then
+          echo "ERROR: Koi ZIP file nahi mili!"
+          exit 1
+        fi
+        echo "Found ZIP: $ZIP_FILE"
+        unzip -q "$ZIP_FILE" -d extracted
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.2.1'
+        # Project root dhoondho (jahan settings.gradle ho)
+        SETTINGS=$(find extracted -name "settings.gradle" | head -n 1)
+        if [ -z "$SETTINGS" ]; then
+          echo "ERROR: settings.gradle nahi mila!"
+          exit 1
+        fi
+        PROJECT_DIR=$(dirname "$SETTINGS")
+        echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
 
-      - name: Install Android SDK & NDK
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p "$ANDROID_HOME/cmdline-tools" /tmp/android-cli
-          curl -fL --retry 3 https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -o /tmp/android-cli.zip
-          unzip -q /tmp/android-cli.zip -d /tmp/android-cli
-          mkdir -p "$ANDROID_HOME/cmdline-tools/latest"
-          cp -R /tmp/android-cli/cmdline-tools/. "$ANDROID_HOME/cmdline-tools/latest/"
-          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
-          yes | "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --licenses || true
-          "$SDKMANAGER" --sdk_root="$ANDROID_HOME" "platform-tools" "platforms;android-34" "build-tools;34.0.0" "ndk;25.2.9519653" "cmake;3.22.1"
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
 
-      - name: Extract Project ZIP
-        shell: bash
-        run: |
-          set -euo pipefail
+    - name: Setup Android SDK & NDK
+      run: |
+        echo "y" | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "ndk;25.2.9519653" "cmake;3.22.1"
 
-          OUTER=$(find . -type f -name "*.zip" -not -path "./.git/*" -print -quit)
+    - name: Build APK
+      run: |
+        cd $PROJECT_DIR
+        chmod +x gradlew || true
+        gradle assembleDebug --no-daemon --stacktrace
 
-          if [ -z "$OUTER" ]; then
-            echo "ERROR: Koi bhi ZIP file nahi mili!"
-            exit 1
-          fi
-
-          echo "Mil gayi ZIP file: $OUTER"
-
-          rm -rf project
-          mkdir -p project
-          unzip -q -o "$OUTER" -d project
-
-          SETTINGS="$(find project -type f \( -name settings.gradle -o -name settings.gradle.kts \) -print -quit)"
-
-          if [ -z "$SETTINGS" ]; then
-            echo "ERROR: settings.gradle nahi mili ZIP ke andar."
-            exit 1
-          fi
-
-          ROOT="$(dirname "$SETTINGS")"
-          echo "PROJECT_DIR=$ROOT" >> "$GITHUB_ENV"
-          echo "Project root detected at: $ROOT"
-
-      - name: Force Fix Gradle Properties
-        shell: bash
-        run: |
-          cd "$PROJECT_DIR"
-          rm -f gradle.properties
-          echo "android.useAndroidX=true" >> gradle.properties
-          echo "android.enableJetifier=true" >> gradle.properties
-          echo "org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8" >> gradle.properties
-          echo "org.gradle.parallel=true" >> gradle.properties
-
-      - name: Clean and Build APK
-        shell: bash
-        run: |
-          set -euo pipefail
-          cd "$PROJECT_DIR"
-          gradle --no-daemon clean assembleDebug --stacktrace
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: Hex-Non-Rooted-APK
-          path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk
-          if-no-files-found: error
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: Ghost-Lag-Hex-APK
+        path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk
+        if-no-files-found: error
