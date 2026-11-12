@@ -30,7 +30,7 @@ jobs:
         
         cd $PROJECT_DIR
         
-        # 1. Purana cache aur build folder delete karo
+        # 1. Purana AIDE cache aur kachra delete karo
         rm -rf app/.cxx app/build build .gradle || true
         
         # 2. Saari files ka time fix karo (Infinite loop rokne ke liye)
@@ -49,11 +49,12 @@ jobs:
       run: |
         echo "y" | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "ndk;25.1.8937393" "cmake;3.22.1"
 
-    - name: Build APK
+    # YAHAN HUM GRADLEWRAPER KI JAGAH DIRECT GRADLE USE KAR RAHE HAIN
+    - name: Build APK with System Gradle
       run: |
         cd ${{ env.PROJECT_DIR }}
-        chmod +x gradlew || true
-        ./gradlew assembleDebug --no-daemon --no-build-cache
+        # Gradlew ko touch karne ki zaroorat nahi, direct gradle command chalayenge
+        gradle assembleDebug --no-daemon --no-build-cache --stacktrace
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
