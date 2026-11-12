@@ -30,13 +30,13 @@ jobs:
         
         cd $PROJECT_DIR
         
-        # 1. Purana AIDE cache aur kachra delete karo
+        # 1. Saara kachra delete karo
         rm -rf app/.cxx app/build build .gradle || true
         
-        # 2. Saari files ka time fix karo (Infinite loop rokne ke liye)
+        # 2. Timestamps fix karo
         find . -exec touch -t 202001010000 {} +
         
-        # 3. CRLF (Windows Enter) fix karo
+        # 3. Windows/AIDE ke CRLF fix karo
         find . -type f -exec sed -i 's/\r$//' {} +
 
     - name: Set up JDK 17
@@ -45,16 +45,20 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
+    # Forcefully Gradle 8.2 use karo
+    - name: Setup Gradle 8.2
+      uses: gradle/actions/setup-gradle@v3
+      with:
+        gradle-version: '8.2'
+
     - name: Setup Android SDK & NDK
       run: |
         echo "y" | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "ndk;25.1.8937393" "cmake;3.22.1"
 
-    # YAHAN HUM GRADLEWRAPER KI JAGAH DIRECT GRADLE USE KAR RAHE HAIN
-    - name: Build APK with System Gradle
+    - name: Build APK
       run: |
         cd ${{ env.PROJECT_DIR }}
-        # Gradlew ko touch karne ki zaroorat nahi, direct gradle command chalayenge
-        gradle assembleDebug --no-daemon --no-build-cache --stacktrace
+        gradle assembleDebug --no-daemon --no-build-cache
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
