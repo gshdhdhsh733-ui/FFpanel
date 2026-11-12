@@ -13,36 +13,31 @@ jobs:
     - name: Checkout Code
       uses: actions/checkout@v4
 
-    - name: Find Project Files
+    - name: Extract & Fix Timestamps
       run: |
         set -e
-        
-        # Check karo agar project direct root me hai (bina zip ke)
-        if [ -f "settings.gradle" ] || [ -f "settings.gradle.kts" ]; then
-          echo "Project files direct mil gayi hain. Koi ZIP ki zaroorat nahi."
+        if [ -f "settings.gradle" ]; then
           echo "PROJECT_DIR=." >> $GITHUB_ENV
         else
-          # Agar direct nahi hai, toh poore repo me ZIP dhoondho
           ZIP_FILE=$(find . -name "*.zip" | head -n 1)
-          if [ -z "$ZIP_FILE" ]; then
-            echo "ERROR: Na toh ZIP mili aur na hi direct project files!"
-            exit 1
-          fi
-          echo "ZIP mil gayi: $ZIP_FILE"
-          
+          if [ -z "$ZIP_FILE" ]; then echo "No ZIP found"; exit 1; fi
           mkdir -p extracted
-          unzip -q "$ZIP_FILE" -d extracted
-          
-          # ZIP ke andar settings.gradle dhoondho
+          unzip -q -DD "$ZIP_FILE" -d extracted
           SETTINGS=$(find extracted -name "settings.gradle" | head -n 1)
-          if [ -z "$SETTINGS" ]; then
-            echo "ERROR: ZIP ke andar settings.gradle nahi mila!"
-            exit 1
-          fi
-          
           PROJECT_DIR=$(dirname "$SETTINGS")
           echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
         fi
+        
+        cd $PROJECT_DIR
+        
+        # 1. Purana cache aur build folder delete karo
+        rm -rf app/.cxx app/build build .gradle || true
+        
+        # 2. Saari files ka time fix karo (Infinite loop rokne ke liye)
+        find . -exec touch -t 202001010000 {} +
+        
+        # 3. CRLF (Windows Enter) fix karo
+        find . -type f -exec sed -i 's/\r$//' {} +
 
     - name: Set up JDK 17
       uses: actions/setup-java@v4
@@ -52,13 +47,13 @@ jobs:
 
     - name: Setup Android SDK & NDK
       run: |
-        echo "y" | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "ndk;25.2.9519653" "cmake;3.22.1"
+        echo "y" | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "ndk;25.1.8937393" "cmake;3.22.1"
 
     - name: Build APK
       run: |
         cd ${{ env.PROJECT_DIR }}
         chmod +x gradlew || true
-        gradle assembleDebug --no-daemon --stacktrace
+        ./gradlew assembleDebug --no-daemon --no-build-cache
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
